@@ -5,10 +5,8 @@ import streamlit as st
 from PIL import Image
 import io
 
-# Set page config
 st.set_page_config(page_title="Quiz Grader", page_icon="📝", layout="wide")
 
-# Initialize session state
 if 'extracted_text' not in st.session_state:
     st.session_state.extracted_text = ""
 if 'grading_result' not in st.session_state:
@@ -34,7 +32,7 @@ def read_and_encode_image(uploaded_file):
 def extract_text_with_gemini(image_data, api_key):
     try:
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-2.5-flash")  # Updated to a more capable model
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         response = model.generate_content([
             "Extract all text from this image exactly as written. Preserve line breaks, spacing, and formatting. If its an MCQ, give marked with option which student marked correct",
@@ -102,7 +100,7 @@ with st.sidebar:
         st.rerun()
     
     st.info("Workflow:")
-    st.info("1. Upload quiz images\n2. Provide rubric (text or image)\n3. Process quiz\n4. Review results")
+    st.info("1. Upload or Take quiz images\n2. Provide rubric (text or image)\n3. Process quiz\n4. Review results")
 
 # Main content tabs
 tab1, tab2, tab3 = st.tabs(["📷 Upload Quiz", "📝 Grading Rubric", "📊 Results"])
@@ -239,5 +237,3 @@ with tab3:
 
 # Footer
 st.divider()
-st.caption("ℹ️ This app uses Gemini AI for text extraction and OpenAI for grading. "
-           "Quiz images are processed sequentially, and rubric images are converted to text before evaluation.")
