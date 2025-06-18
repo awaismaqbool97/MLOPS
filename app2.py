@@ -7,6 +7,7 @@ import io
 
 st.set_page_config(page_title="Quiz Grader", page_icon="📝", layout="wide")
 
+# Initialize session state
 if 'extracted_text' not in st.session_state:
     st.session_state.extracted_text = ""
 if 'grading_result' not in st.session_state:
@@ -15,6 +16,8 @@ if 'uploaded_images' not in st.session_state:
     st.session_state.uploaded_images = []
 if 'rubric_image' not in st.session_state:
     st.session_state.rubric_image = None
+if 'processing_complete' not in st.session_state:
+    st.session_state.processing_complete = False
 
 # Function to encode image
 def read_and_encode_image(uploaded_file):
@@ -97,6 +100,7 @@ with st.sidebar:
         st.session_state.grading_result = ""
         st.session_state.uploaded_images = []
         st.session_state.rubric_image = None
+        st.session_state.processing_complete = False
         st.rerun()
     
     st.info("Workflow:")
@@ -120,7 +124,15 @@ with tab1:
                 accept_multiple_files=True
             )
             if uploaded_files:
-                st.session_state.uploaded_images = uploaded_files
+                # Deduplicate uploaded files
+                new_files = []
+                existing_files = [f.getvalue() for f in st.session_state.uploaded_images]
+                
+                for file in uploaded_files:
+                    if file.getvalue() not in existing_files:
+                        new_files.append(file)
+                
+                st.session_state.uploaded_images.extend(new_files)
         else:
             camera_files = st.camera_input(
                 "Take pictures of quiz pages (capture one at a time)",
@@ -128,14 +140,24 @@ with tab1:
                 label_visibility="collapsed"
             )
             if camera_files:
-                # Append to existing images
-                st.session_state.uploaded_images.append(camera_files)
+                existing_files = [f.getvalue() for f in st.session_state.uploaded_images]
+                
+                if camera_files.getvalue() not in existing_files:
+                    st.session_state.uploaded_images.append(camera_files)
+                
+                st.session_state.camera_uploader = None
     
     with col2:
         if st.session_state.uploaded_images:
             st.subheader(f"{len(st.session_state.uploaded_images)} Images Ready")
             for i, img in enumerate(st.session_state.uploaded_images):
-                st.image(img, caption=f"Page {i+1}", width=150)
+                cols = st.columns([4, 1])
+                with cols[0]:
+                    st.image(img, caption=f"Page {i+1}", width=150)
+                with cols[1]:
+                    if st.button("❌", key=f"remove_{i}"):
+                        st.session_state.uploaded_images.pop(i)
+                        st.rerun()
         else:
             st.info("No images uploaded yet")
 
@@ -212,6 +234,9 @@ with tab3:
                 rubric_text, 
                 openai_key
             )
+        
+        st.session_state.processing_complete = True
+        st.rerun()
     
     # Display extracted text
     if st.session_state.extracted_text:
@@ -230,10 +255,15 @@ with tab3:
         
         if "TOTAL SCORE:" in st.session_state.grading_result:
             # Extract and display score prominently
-            score_part = st.session_state.grading_result.split("TOTAL SCORE:")[-1].strip()
+            score_part = st.session_state.grading_result.split("TOTAL SCORE:")[-1].split('\n')[0].strip()
             st.metric("Final Score", score_part)
         
         st.markdown(st.session_state.grading_result)
+        
+        if st.session_state.processing_complete:
+            st.balloons()
+            st.session_state.processing_complete = False
 
 # Footer
 st.divider()
+st.caption("Handwritten Quiz Grader | Automate your grading workflow")
