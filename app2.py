@@ -4,6 +4,7 @@ import openai
 import streamlit as st
 from PIL import Image
 import io
+import hashlib
 
 st.set_page_config(page_title="Quiz Grader", page_icon="📝", layout="wide")
 
@@ -18,6 +19,12 @@ if 'rubric_image' not in st.session_state:
     st.session_state.rubric_image = None
 if 'processing_complete' not in st.session_state:
     st.session_state.processing_complete = False
+if 'camera_counter' not in st.session_state:
+    st.session_state.camera_counter = 0
+
+# Function to generate image hash
+def generate_image_hash(image_bytes):
+    return hashlib.md5(image_bytes).hexdigest()
 
 # Function to encode image
 def read_and_encode_image(uploaded_file):
@@ -96,11 +103,9 @@ with st.sidebar:
     
     st.divider()
     if st.button("Reset All", use_container_width=True, type="secondary"):
-        st.session_state.extracted_text = ""
-        st.session_state.grading_result = ""
-        st.session_state.uploaded_images = []
-        st.session_state.rubric_image = None
-        st.session_state.processing_complete = False
+        for key in list(st.session_state.keys()):
+            if key != 'camera_counter':
+                del st.session_state[key]
         st.rerun()
     
     st.info("Workflow:")
@@ -124,28 +129,40 @@ with tab1:
                 accept_multiple_files=True
             )
             if uploaded_files:
-                # Deduplicate uploaded files
-                new_files = []
-                existing_files = [f.getvalue() for f in st.session_state.uploaded_images]
+                # Create a set of existing image hashes
+                existing_hashes = set()
+                if st.session_state.uploaded_images:
+                    for img in st.session_state.uploaded_images:
+                        existing_hashes.add(generate_image_hash(img.getvalue()))
                 
+                # Add new files that aren't duplicates
                 for file in uploaded_files:
-                    if file.getvalue() not in existing_files:
-                        new_files.append(file)
-                
-                st.session_state.uploaded_images.extend(new_files)
+                    file_hash = generate_image_hash(file.getvalue())
+                    if file_hash not in existing_hashes:
+                        st.session_state.uploaded_images.append(file)
+                        existing_hashes.add(file_hash)
         else:
+            # Use counter to manage camera widget
             camera_files = st.camera_input(
                 "Take pictures of quiz pages (capture one at a time)",
-                key="camera_uploader",
+                key=f"camera_{st.session_state.camera_counter}",
                 label_visibility="collapsed"
             )
             if camera_files:
-                existing_files = [f.getvalue() for f in st.session_state.uploaded_images]
+                # Create a set of existing image hashes
+                existing_hashes = set()
+                if st.session_state.uploaded_images:
+                    for img in st.session_state.uploaded_images:
+                        existing_hashes.add(generate_image_hash(img.getvalue()))
                 
-                if camera_files.getvalue() not in existing_files:
+                # Add new camera capture if not duplicate
+                file_hash = generate_image_hash(camera_files.getvalue())
+                if file_hash not in existing_hashes:
                     st.session_state.uploaded_images.append(camera_files)
                 
-                st.session_state.camera_uploader = None
+                # Increment counter to reset camera
+                st.session_state.camera_counter += 1
+                st.rerun()
     
     with col2:
         if st.session_state.uploaded_images:
@@ -236,7 +253,6 @@ with tab3:
             )
         
         st.session_state.processing_complete = True
-        st.rerun()
     
     # Display extracted text
     if st.session_state.extracted_text:
