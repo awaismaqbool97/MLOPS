@@ -1,2 +1,3 @@
-# MLOPS
-This is an Automated Handwritten quiz grader.
+# MLOPS Project
+## Muhammad Awais
+## MSDS24035
